@@ -1,0 +1,4 @@
+build/
+firmware/
+tools/preview/
+.DS_Store
