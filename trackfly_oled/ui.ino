@@ -16,6 +16,14 @@ static String trackKey;
 static bool screenLit = true;
 static bool nightDim = false;
 static uint32_t idleSince = 0;
+// Keys
+static uint32_t infoUntil = 0;       // track details on screen until then
+static bool clockView = false;       // clock instead of the track (keys 2+3)
+static int volShown = -1;            // volume on the dot row ...
+static uint32_t volUntil = 0;        // ... until then
+static bool manualOff = false;       // screen switched off with key 4
+static uint32_t peekUntil = 0;       // a key lit a dark screen until then
+static uint32_t lastKeyAt = 0;
 
 void uiMessage(const char *title, const char *line1, const char *line2, const char *qr) {
   msgMode = true;
@@ -113,10 +121,14 @@ static void wander(int amp) {
 
 static void drawFrame() {
   uint32_t now = millis();
+  if (infoUntil && now >= infoUntil) infoUntil = 0;
+  if (volUntil && now >= volUntil) { volUntil = 0; volShown = -1; }
   if (msgMode) {
     screens::setShift(0, 0);
     screens::message(msgTitle.c_str(), msgL1.c_str(), msgL2.c_str(), msgQr.c_str(), now);
-  } else if (playMode()) {
+  } else if (infoUntil) {
+    drawInfo();
+  } else if (playMode() && !clockView) {
     wander(1);
     String title = cur.title.length() ? cur.title : cur.text;
     String meta = metaLeft();
@@ -126,6 +138,7 @@ static void drawFrame() {
     if (cur.duration > 0 && pos > cur.duration) pos = cur.duration;
     if (cfg.show & SHOW_TIME)
       time = cur.duration > 0 ? fmtTime((int)pos) + " / " + fmtTime((int)cur.duration) : String("LIVE");
+    if (volShown >= 0) time = "VOLUME " + String(volShown);
     screens::Now v;
     v.title = title.c_str();
     v.artist = cur.title.length() ? cur.artist.c_str() : "";
@@ -137,6 +150,7 @@ static void drawFrame() {
     v.dots = cfg.show & SHOW_DOTS;
     v.since = trackSince;
     v.speed = cfg.speed;
+    v.volume = volShown;
     screens::nowPlaying(v, now);
   } else {
     wander(4);
@@ -163,6 +177,48 @@ static void drawFrame() {
 
 void uiDrawNow() { drawFrame(); oledPush(); }
 
+// ---------- keys ----------
+bool uiKeyWake() {
+  lastKeyAt = millis();
+  if (manualOff) { manualOff = false; return true; }
+  if (!screenLit) { peekUntil = millis() + 15000; return true; }   // first press only lights it
+  if (peekUntil) peekUntil = millis() + 15000;
+  return false;
+}
+
+void uiInfo() {
+  if (infoUntil && millis() < infoUntil) { infoUntil = 0; return; }   // pressed again: back
+  infoUntil = millis() + 7000;
+}
+
+void uiToggleClock() { clockView = !clockView; infoUntil = 0; }
+
+void uiVolume(int v) { volShown = v; volUntil = millis() + 2500; }
+
+void uiScreenOff() { manualOff = true; }
+
+int uiVolumeNow() { return cur.volume; }
+
+static void drawInfo() {
+  screens::setShift(0, 0);
+  String title, l1, l2, l3;
+  if (playMode()) {
+    title = cur.album.length() ? cur.album : (cur.title.length() ? cur.title : cur.text);
+    l1 = cur.artist;
+    l2 = sourceName(cur.source);
+    if (cur.zone.length()) l2 += " \xC2\xB7 " + cur.zone;
+    if (cur.trackNumber > 0) l2 += " \xC2\xB7 " + String(cur.trackNumber) + (cur.trackCount > 0 ? "/" + String(cur.trackCount) : "");
+    if (cur.volume >= 0) l2 += " \xC2\xB7 VOL " + String(cur.volume);
+    l2.toUpperCase();
+  } else {
+    title = "Nothing playing";
+    l1 = followLabel().length() ? "Following " + followLabel() : String("Following whatever plays");
+    l2 = wifiReady() ? (cur.reachable ? "Track Fly " + feedBase().substring(7) : String("Track Fly not found")) : String("No WiFi");
+  }
+  l3 = WiFi.localIP().toString() + " \xC2\xB7 v" FW_VERSION;
+  screens::info(title.c_str(), l1.c_str(), l2.c_str(), l3.c_str());
+}
+
 void uiLoop() {
   static uint32_t last = 0, lastLight = 0, lastTake = 0;
   uint32_t rev = curRev;
@@ -175,7 +231,8 @@ void uiLoop() {
       if (key != trackKey) { trackKey = key; trackSince = millis(); }
     }
   }
-  bool playing = !msgMode && playMode();
+  bool playing = !msgMode && playMode() && !clockView;
+  if (clockView && !playMode()) clockView = false;   // nothing to hide any more
   updateLoop(!playMode());
 
   // Screen on/off and night dimming, checked twice a second.
@@ -184,12 +241,14 @@ void uiLoop() {
     if (playing) idleSince = 0; else if (!idleSince) idleSince = millis();
     bool night = nightNow();
     bool lit = true;
-    if (!msgMode && !playing) {
+    if (!msgMode && !playing && !(peekUntil && millis() < peekUntil)) {
       // Nothing plays: the clock, or a dark screen (after a short grace so a track
       // change does not blink the screen off).
       bool dark = !(cfg.show & SHOW_CLOCK) || (night && cfg.nightMode == 1);
       if (dark && millis() - idleSince > 8000) lit = false;
     }
+    if (peekUntil && millis() >= peekUntil) peekUntil = 0;
+    if (manualOff) lit = false;
     if (lit != screenLit) { screenLit = lit; oledPower(lit); }
     bool dim = night && cfg.nightMode == 0;
     if (dim != nightDim) { nightDim = dim; oledBrightness(dim ? 255 : cfg.bright); }
@@ -197,7 +256,7 @@ void uiLoop() {
   if (!screenLit) return;
 
   // ~30 frames/s while something moves, slower otherwise. Unchanged frames are not sent.
-  uint32_t every = playing ? 33 : msgMode ? 100 : 250;
+  uint32_t every = playing || volShown >= 0 ? 33 : (msgMode || infoUntil || millis() - lastKeyAt < 1000) ? 60 : 250;
   if (millis() - last < every) return;
   last = millis();
   drawFrame();

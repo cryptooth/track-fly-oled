@@ -38,6 +38,7 @@ struct NowPlaying {
   String playlist;                       // playlist being played
   int queueIndex = 0, queueCount = 0;    // place in the playlist
   int queueRemaining = -1;               // tracks left in the queue (Roon), -1 unknown
+  int volume = -1;                       // 0-100, -1 = no volume control
   uint32_t rxMillis = 0;
   bool reachable = false;  // last fetch got an answer from Track Fly
 };
@@ -56,6 +57,7 @@ bool wifiReady();
 String feedBase();
 void netSaveWifi(const String &ssid, const String &pass);
 bool netInSetup();
+void netStartSetup();            // open the setup portal now (key combo)
 
 // ---------- feed.ino ----------
 void feedBegin();
@@ -65,6 +67,13 @@ uint32_t feedRevision();
 struct Target { String label, source, zone; };
 int  feedTargets(Target *out, int max);
 bool feedTakeDiscovered(String &base);
+struct CtrlMsg { char action[12]; int value; };   // one queued /control request
+// GET /control for what the display follows: playpause | next | prev | volume (value 0-100)
+void feedControl(const char *action, int value = -1);
+
+// ---------- keys.ino (1x4 membrane keypad: GPIO0, 1, 10, 20 to GND) ----------
+void keysBegin();
+void keysLoop();
 
 // ---------- update.ino ----------
 void updateBegin();
@@ -84,6 +93,12 @@ void uiShowMain();
 void uiToast(const String &s, uint32_t ms = 2200);
 void uiApplySettings();
 void uiDrawNow();                // draw + push right away (before a long blocking step)
+bool uiKeyWake();                // a key was pressed: true if it only woke the screen
+void uiInfo();                   // track details for a few seconds
+void uiToggleClock();            // clock instead of the track, until pressed again
+void uiVolume(int v);            // show the volume on the dot row for a moment
+void uiScreenOff();              // dark until a key is pressed
+int  uiVolumeNow();              // last volume Track Fly reported, -1 unknown
 
 // ---------- settings (trackfly_oled.ino) ----------
 void settingsLoad();

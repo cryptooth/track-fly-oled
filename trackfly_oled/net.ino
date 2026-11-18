@@ -374,3 +374,7 @@ void netLoop() {
     default: break;
   }
 }
+
+void netStartSetup() {
+  if (netMode != NET_AP) startSetupPortal("Setup");
+}

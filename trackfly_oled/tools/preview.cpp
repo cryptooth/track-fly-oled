@@ -88,5 +88,11 @@ int main() {
   screens::message("Connected", "track-fly-3068.local", "192.168.1.42", nullptr, 0); save("8-connected");
 
   screens::logo(2000); save("9-logo");
+  n.title = "Wish You Were Here"; n.artist = "Pink Floyd"; n.album = "Wish You Were Here";
+  n.metaL = "ROON \xC2\xB7 KITCHEN \xC2\xB7 4/5"; n.metaR = "VOLUME 42"; n.progress = 0.48f; n.volume = 42;
+  screens::nowPlaying(n, 0); save("10-volume");
+  screens::info("Wish You Were Here", "Pink Floyd", "ROON \xC2\xB7 KITCHEN \xC2\xB7 4/5 \xC2\xB7 VOL 42",
+                "192.168.1.42 \xC2\xB7 v0.2.0");
+  save("11-info");
   return 0;
 }

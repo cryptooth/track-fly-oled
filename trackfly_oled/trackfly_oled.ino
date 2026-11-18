@@ -3,8 +3,8 @@
  * ---------------------------------------------------------------------------
  * Shows the Track Fly now-playing JSON feed (http://<mac>:8765/now) in 16 grey
  * levels: title, artist and album in Kode Mono, the Track Fly dot row as progress,
- * a clock when nothing plays. No buttons, no touch: everything else is on the
- * device's web page.
+ * a clock when nothing plays. Optional 1x4 keypad (keys.ino) for play/pause, skip,
+ * volume, zone and brightness; everything else is on the device's web page.
  *
  *  - First boot: the device opens its own WiFi "TRACK-FLY-XXXX" (password trackfly)
  *    and shows a QR code. Join it, pick the home network, done.
@@ -17,7 +17,7 @@
  *        1.9 MB app slots for OTA)
  */
 
-#define FW_VERSION "0.1.3"
+#define FW_VERSION "0.2.1"
 
 #include <Arduino.h>
 #include <Preferences.h>
@@ -115,6 +115,7 @@ void setup() {
   oledBrightness(cfg.bright);
   uiBootLogo();
   updateBegin();
+  keysBegin();
   feedBegin();               // background task, waits for WiFi
   netBegin();                // connects or opens the setup portal
 }
@@ -131,6 +132,7 @@ void loop() {
   }
   serialCommands();
   netLoop();
+  keysLoop();
   uiLoop();
   delay(2);
 }

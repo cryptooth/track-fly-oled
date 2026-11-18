@@ -61,6 +61,11 @@ static void line(const Font &f, int baseline, int y0, int y1, const Seg *seg, in
 }
 
 static void dotRow(const Now &n, uint32_t ms) {
+  if (n.volume >= 0) {           // volume: lit dots up to the level, nothing lifted
+    int lit = (n.volume * DOTS + 50) / 100;
+    for (int i = 0; i < DOTS; i++) gfx::dot(DOT_X0 + i * PITCH, ROW_Y, i < lit ? 13 : 2);
+    return;
+  }
   int head;
   if (n.progress >= 0) {
     float p = n.progress > 1 ? 1 : n.progress;
@@ -98,7 +103,7 @@ void nowPlaying(const Now &n, uint32_t ms) {
   else if (!*n.artist) { sub[0] = sub[2]; segs = 1; }
   line(F_SUB, 49, 36, 53, sub, segs, t, n.speed);
 
-  if (n.dots) dotRow(n, ms);
+  if (n.dots || n.volume >= 0) dotRow(n, ms);
 }
 
 void clock(const Clock &c, uint32_t) {
@@ -152,6 +157,14 @@ void message(const char *title, const char *line1, const char *line2, const char
   if (line1) gfx::text(F_META, 0, 45, line1, 8, 0, right);
   if (line2) gfx::text(F_META, 0, 58, line2, 8, 0, right);
   (void)ms;
+}
+
+void info(const char *title, const char *l1, const char *l2, const char *l3) {
+  gfx::clear();
+  gfx::text(F_SUB, 0, 14, title, 15);
+  const char *l[3] = {l1, l2, l3};
+  const uint8_t lv[3] = {9, 7, 4};
+  for (int i = 0; i < 3; i++) if (l[i]) gfx::text(F_META, 0, 31 + i * 13, l[i], lv[i]);
 }
 
 void logo(uint32_t ms) {

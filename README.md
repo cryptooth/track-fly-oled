@@ -2,11 +2,15 @@
 
 <img src="media/playing.png" alt="The Track Fly OLED: source and time on top, the title, artist and album, and the row of dots with the playing one lifted" width="640">
 
-Firmware that turns an **ESP32-C3 SuperMini** and a **3.12" 256×64 SSD1322 OLED** into a now-playing display for your Mac. No buttons, no touch: it shows what plays, a clock when nothing does, and everything else lives on its own web page.
+Firmware that turns an **ESP32-C3 SuperMini** and a **3.12" 256×64 SSD1322 OLED** into a now-playing display for your Mac. It shows what plays and a clock when nothing does. An optional four-key membrane pad gives you play/pause, skip, volume, zone and brightness; everything else lives on its own web page.
 
 It reads the feed of **[Track Fly](https://trackfly.stream)**, a free macOS menu bar app that turns what is playing in Apple Music, Spotify, Roon and Plex into one JSON feed on your local network. You need Track Fly running on a Mac on the same network.
 
 **Website and downloads: [trackfly.stream](https://trackfly.stream)** · Ready-made firmware: [trackfly.stream/firmware/oled](https://trackfly.stream/firmware/oled/) · The touch display version: [track-fly-waveshare](https://github.com/cryptooth/track-fly-waveshare)
+
+| Volume (keypad) | Track details (keypad) |
+|---|---|
+| ![The dot row shows the volume while it changes](media/volume.png) | ![Album, artist, source, zone and volume](media/info.png) |
 
 | Paused | Nothing playing | First setup |
 |---|---|---|
@@ -24,12 +28,14 @@ The pictures are rendered by the firmware's own drawing code (`tools/preview.sh`
 - **Burn-in care:** the picture moves by a pixel every few minutes.
 - **Finds the Mac by itself:** if the Mac's address changes, it looks for Track Fly on the network (`_trackfly._tcp`).
 - **Updates itself:** it checks [trackfly.stream/firmware/oled](https://trackfly.stream/firmware/oled/) once a day and installs a newer version while nothing plays (SHA-256 checked, can be turned off). Track Fly 1.8+ also lists it under Settings › Displays.
+- **Optional keypad:** previous, play/pause, next and track details; hold for volume, the next Roon zone and brightness.
 - **Set up from your phone** with a QR code. No app, no cloud, no account.
 
 ## Hardware
 
 - ESP32-C3 SuperMini (USB-C). Other ESP32-C3 boards work too; change the pins in `oled.ino`.
 - 3.12" 256×64 OLED with an SSD1322 driver (the common blue-board module).
+- Optional: a 1×4 membrane keypad.
 - Optional: the SuperMini's expansion board with a battery socket and charger.
 
 ### Wiring
@@ -47,6 +53,19 @@ The module's resistors choose the bus. With **R19 and R21 fitted** it is in 4-wi
 | CS | GPIO7 |
 
 Leave D2–D7 unconnected. With **R19 and R20** fitted the module is in 3-wire SPI mode (no D/C): set `OLED_DC` to `-1` in `oled.ino` and leave D/C unconnected. Never tie D/C to GND while the firmware drives it.
+
+### Keypad (optional)
+
+A 1×4 membrane keypad: the common wire to GND, keys 1–4 to GPIO0, GPIO1, GPIO10 and GPIO20 (the firmware turns on the internal pull-ups). Key 3 is also read on GPIO3, but keep GPIO3 free if you plan to measure a battery there.
+
+| Key | Short press | Long press (0.6 s) |
+|---|---|---|
+| 1 | previous track | volume down (keeps going while held) |
+| 2 | play / pause | follow the next Roon zone (Auto, then each zone) |
+| 3 | next track | volume up (keeps going while held) |
+| 4 | track details for 7 s (album, source, zone, volume, address) | brightness step; after Max the screen turns off |
+
+Hold **1 + 4** for 3 s to open WiFi setup; hold **2 + 3** for 1 s to show the clock instead of the track (again to go back). On a dark screen the first press only lights it. While the volume changes, the dot row shows the level. Volume works for Roon, Apple Music and Spotify.
 
 ## Install
 

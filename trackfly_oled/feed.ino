@@ -9,6 +9,7 @@ static TaskHandle_t feedTaskHandle;
 static NowPlaying shared;
 static uint32_t sharedRev = 0;
 static Target targets[12];
+static QueueHandle_t ctrlQueue;
 static int targetCount = 0;
 
 static String urlEncode(const String &s) {
@@ -63,6 +64,7 @@ static bool fetchNow(NowPlaying &n) {
   n.queueIndex  = doc["queue_index"] | 0;
   n.queueCount  = doc["queue_count"] | 0;
   n.queueRemaining = doc["queue_remaining"].isNull() ? -1 : (int)(doc["queue_remaining"] | -1);
+  n.volume = doc["volume"].isNull() ? -1 : (int)(doc["volume"] | -1);
   n.rxMillis = millis();
   return true;
 }
@@ -116,7 +118,26 @@ static bool sameTrack(const NowPlaying &a, const NowPlaying &b) {
          a.text == b.text && a.source == b.source && a.zone == b.zone && a.reachable == b.reachable &&
          a.duration == b.duration && a.trackNumber == b.trackNumber && a.trackCount == b.trackCount &&
          a.playlist == b.playlist && a.queueIndex == b.queueIndex && a.queueCount == b.queueCount &&
-         a.queueRemaining == b.queueRemaining;
+         a.queueRemaining == b.queueRemaining && a.volume == b.volume;
+}
+
+// GET /control for the target the display follows (Track Fly picks the same one /now shows).
+static void sendControl(const CtrlMsg &m) {
+  String url = feedBase() + "/control?action=" + m.action;
+  if (m.value >= 0) url += "&value=" + String(m.value);
+  if (cfg.zone.length())   url += "&zone=" + urlEncode(cfg.zone);
+  if (cfg.source.length()) url += "&source=" + urlEncode(cfg.source);
+  String body;
+  bool ok = httpGet(url, body);
+  Serial.printf("control %s %d -> %s\n", m.action, m.value, ok ? "ok" : "failed");
+}
+
+void feedControl(const char *action, int value) {
+  CtrlMsg m;
+  strlcpy(m.action, action, sizeof m.action);
+  m.value = value;
+  xQueueSend(ctrlQueue, &m, 0);
+  feedKick();
 }
 
 static void feedTask(void *) {
@@ -124,6 +145,10 @@ static void feedTask(void *) {
   for (;;) {
     uint32_t wait = 3000;
     if (wifiReady() && !updateBusy()) {
+      CtrlMsg m;
+      bool sent = false;
+      while (xQueueReceive(ctrlQueue, &m, 0) == pdTRUE) { sendControl(m); sent = true; }
+      if (sent) vTaskDelay(pdMS_TO_TICKS(500));   // let Track Fly see the change before we read it
       NowPlaying n;
       bool ok = fetchNow(n);
       if (!ok) { n.reachable = false; n.rxMillis = millis(); }
@@ -153,6 +178,7 @@ static void feedTask(void *) {
 
 void feedBegin() {
   feedMux = xSemaphoreCreateMutex();
+  ctrlQueue = xQueueCreate(8, sizeof(CtrlMsg));
   xTaskCreate(feedTask, "feed", 8192, NULL, 1, &feedTaskHandle);
 }
 
