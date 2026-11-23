@@ -81,6 +81,8 @@ int main() {
 
   screens::Clock c; c.time = "21:08"; c.date = "TUE 17 NOV"; c.note = "ROON \xC2\xB7 DAC";
   screens::clock(c, 0); save("6-clock");
+  c.news = "Ukrayna Devlet Ba\xC5\x9Fkan\xC4\xB1 Zelenskiy\xE2\x80\x99" "den \xE2\x80\x98NATO\xE2\x80\x99 a\xC3\xA7\xC4\xB1klamas\xC4\xB1   \xE2\x80\xA2   Galatasaray farkl\xC4\xB1, T\xC3\xBCrkiye'nin en iyi tak\xC4\xB1m\xC4\xB1";
+  screens::clock(c, 9000); save("6b-clock-news");
 
   screens::message("Setup", "Join TRACK-FLY-3068", "password trackfly", "WIFI:T:WPA;S:TRACK-FLY-3068;P:trackfly;;", 0);
   save("7-setup");

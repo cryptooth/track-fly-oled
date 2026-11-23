@@ -106,15 +106,23 @@ void nowPlaying(const Now &n, uint32_t ms) {
   if (n.dots || n.volume >= 0) dotRow(n, ms);
 }
 
-void clock(const Clock &c, uint32_t) {
+// With headlines the clock moves up and they glide along the bottom without a pause.
+void clock(const Clock &c, uint32_t ms) {
   gfx::clear();
+  bool news = c.news && *c.news;
   int w = gfx::textWidth(F_CLOCK, c.time);
-  gfx::text(F_CLOCK, (GFX_W - w) / 2, 38, c.time, 11);
+  gfx::text(F_CLOCK, (GFX_W - w) / 2, news ? 31 : 38, c.time, 11);
   char line[96];
   if (*c.note) snprintf(line, sizeof line, "%s  \xC2\xB7  %s", c.date, c.note);
   else snprintf(line, sizeof line, "%s", c.date);
   w = gfx::textWidth(F_META, line);
-  gfx::text(F_META, (GFX_W - w) / 2, 55, line, 5);
+  gfx::text(F_META, (GFX_W - w) / 2, news ? 44 : 55, line, 5);
+  if (!news) return;
+  static const int pxs[] = {18, 30, 48};
+  int nw = gfx::textWidth(F_META, c.news) + GAP;
+  int off = (int)((uint64_t)ms * pxs[c.speed > 2 ? 2 : c.speed] / 1000 % nw);
+  for (int x = -off; x < GFX_W; x += nw) gfx::text(F_META, x, 61, c.news, 8);
+  gfx::fadeEdges(0, GFX_W, 50, 64, 18, 18);
 }
 
 static void qrBox(const char *payload) {

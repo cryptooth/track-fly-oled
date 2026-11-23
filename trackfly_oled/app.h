@@ -18,6 +18,9 @@ struct Settings {
   uint8_t nightMode  = 0;           // 0 dim to the lowest step, 1 screen off
   uint8_t speed  = 1;               // text scroll: 0 slow, 1 normal, 2 fast
   uint16_t show  = 0xFFFF;          // SHOW_* bits: what the screen shows
+  bool newsOn    = false;           // headlines along the bottom of the clock screen
+  String newsUrl = "";              // RSS / Atom feed, read by Track Fly (/news)
+  uint8_t newsN  = 10;              // how many headlines
   bool autoUpdate = true;           // install new firmware from trackfly.stream by itself
 };
 
@@ -67,6 +70,9 @@ uint32_t feedRevision();
 struct Target { String label, source, zone; };
 int  feedTargets(Target *out, int max);
 bool feedTakeDiscovered(String &base);
+bool newsTake(String &text, uint32_t &rev);   // headlines as one line; rev changes when they do
+String newsStatus();                          // for the web page
+void newsRefresh();                           // read the feed again now (settings saved)
 struct CtrlMsg { char action[12]; int value; };   // one queued /control request
 // GET /control for what the display follows: playpause | next | prev | volume (value 0-100)
 void feedControl(const char *action, int value = -1);

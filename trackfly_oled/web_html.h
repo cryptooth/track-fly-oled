@@ -115,6 +115,14 @@ static const char CONTROL_HTML[] PROGMEM = R"HTML(<!doctype html><html><head><me
 <label>Time zone</label><select id=tz></select>
 </section>
 
+<section><h2>News</h2>
+<label class=chk><input type=checkbox id=newson> Headlines glide along the bottom of the clock screen</label>
+<label>RSS or Atom feed address</label><input type=text id=newsurl placeholder="https://feeds.bbci.co.uk/news/rss.xml">
+<label>Headlines</label><select id=newsn><option>3</option><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option></select>
+<button onclick=saveNews()>Save</button><div class=st id=newsst></div>
+<p class=hint>Track Fly reads the feed for the display (Track Fly 1.10.6 or Track Fly Server 1.2.6 and later).</p>
+</section>
+
 <section><h2>Device</h2>
 <label>Name (opens as name.local)</label><input type=text id=name maxlength=31>
 <label>New web password (blank keeps the current one, user is admin)</label><input type=password id=wpass maxlength=31>
@@ -152,7 +160,7 @@ async function poll(){
   $('ntt').textContent=n.title||n.text||' ';$('nar').textContent=n.artist||'';
   $('wifi').textContent=j.ssid+' · '+j.rssi+' dBm';$('addr').textContent=j.ip;
   $('upd').textContent=j.updStatus||'';const nw=j.latest&&j.latest!=j.fw&&/available/.test(j.updStatus);$('updnow').style.display=nw?'':'none';if(nw)$('updnow').textContent='Install '+j.latest;
-  if(first){first=false;
+  if(first){first=false;$('newson').checked=j.newsOn;$('newsurl').value=j.newsUrl||'';$('newsn').value=String(j.newsN||10);if(![...$('newsn').options].some(o=>o.selected))$('newsn').add(new Option(j.newsN,j.newsN,true,true));
    $('feed').value=j.feed;$('name').value=j.name;$('flip').checked=j.flip;$('autoupd').checked=j.autoUpdate;$('night').checked=j.night;$('nfrom').value=m2t(j.nightFrom);$('nto').value=m2t(j.nightTo);$('nmode').value=j.nightMode;
    $('tz').value=j.tz;BR=j.bright;SP=j.speed;seg();
    BITS.forEach(c=>c.checked=(j.show&+c.dataset.bit)!=0);
@@ -173,6 +181,15 @@ async function save(){
  $('st').textContent='Saving…';
  try{const r=await fetch('/api/settings',{method:'POST',body:b});$('st').textContent=r.ok?'Saved':'Error: '+await r.text();
   $('wpass').value='';$('nopass').checked=false;}catch(e){$('st').textContent='Connection error';}
+}
+async function saveNews(){
+ const st=$('newsst');st.textContent='Saving…';
+ try{const r=await fetch('/api/settings',{method:'POST',body:new URLSearchParams({newsOn:$('newson').checked?1:0,newsUrl:$('newsurl').value,newsN:$('newsn').value})});
+  if(!r.ok){st.textContent='Error: '+await r.text();return;}
+  for(let k=0;k<8;k++){await new Promise(z=>setTimeout(z,1500));const j=await (await fetch('/api/state')).json();
+   $('newson').checked=j.newsOn;$('newsurl').value=j.newsUrl||'';
+   st.textContent='Saved'+(j.newsStatus?': '+j.newsStatus:'');if(!j.newsOn||/headline|answer|reach|old/i.test(j.newsStatus||''))break;}
+ }catch(e){st.textContent='Connection error';}
 }
 function fwup(){
  const f=$('fwf').files[0],st=$('fwst');

@@ -167,6 +167,10 @@ static void handleState() {
   doc["nightMode"] = cfg.nightMode;
   doc["tz"] = cfg.tz;
   doc["speed"] = cfg.speed;
+  doc["newsOn"] = cfg.newsOn;
+  doc["newsUrl"] = cfg.newsUrl;
+  doc["newsN"] = cfg.newsN;
+  doc["newsStatus"] = newsStatus();
   doc["show"] = cfg.show;
   doc["autoUpdate"] = cfg.autoUpdate;
   doc["latest"] = updateLatest();
@@ -208,6 +212,14 @@ static void handleSettings() {
     String nm = sanitizeHost(server.arg("name"));
     if (nm != cfg.name) { cfg.name = nm; startMdns(); }
   }
+  if (server.hasArg("newsUrl")) {
+    String u = server.arg("newsUrl"); u.trim();
+    if (u.length() && !u.startsWith("http://") && !u.startsWith("https://")) u = "https://" + u;
+    cfg.newsUrl = u.substring(0, 300);
+  }
+  if (server.hasArg("newsOn")) cfg.newsOn = server.arg("newsOn") == "1" && cfg.newsUrl.length();
+  if (server.hasArg("newsN"))  cfg.newsN = constrain(server.arg("newsN").toInt(), 1, 30);
+  if (server.hasArg("newsOn") || server.hasArg("newsUrl")) newsRefresh();
   if (server.hasArg("speed")) cfg.speed = constrain(server.arg("speed").toInt(), 0, 2);
   if (server.hasArg("show"))  cfg.show = (uint16_t)server.arg("show").toInt();
   if (server.hasArg("autoUpdate")) cfg.autoUpdate = server.arg("autoUpdate") == "1";

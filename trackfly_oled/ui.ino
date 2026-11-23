@@ -24,6 +24,8 @@ static uint32_t volUntil = 0;        // ... until then
 static bool manualOff = false;       // screen switched off with key 4
 static uint32_t peekUntil = 0;       // a key lit a dark screen until then
 static uint32_t lastKeyAt = 0;
+static String newsText;              // headlines for the clock screen (Settings: News)
+static uint32_t newsRev = 0xFFFFFFFF;
 
 void uiMessage(const char *title, const char *line1, const char *line2, const char *qr) {
   msgMode = true;
@@ -167,6 +169,8 @@ static void drawFrame() {
     else { note = followLabel(); note.toUpperCase(); }
     screens::Clock c;
     c.time = hm; c.date = date; c.note = note.c_str();
+    c.news = wifiReady() ? newsText.c_str() : "";
+    c.speed = cfg.speed;
     screens::clock(c, now);
   }
   if (toastUntil) {
@@ -231,7 +235,9 @@ void uiLoop() {
       if (key != trackKey) { trackKey = key; trackSince = millis(); }
     }
   }
+  { String t; uint32_t r; if (newsTake(t, r) && r != newsRev) { newsRev = r; newsText = t; } }
   bool playing = !msgMode && playMode() && !clockView;
+  bool ticker = !msgMode && !infoUntil && !playing && newsText.length() && wifiReady();
   if (clockView && !playMode()) clockView = false;   // nothing to hide any more
   updateLoop(!playMode());
 
@@ -256,7 +262,7 @@ void uiLoop() {
   if (!screenLit) return;
 
   // ~30 frames/s while something moves, slower otherwise. Unchanged frames are not sent.
-  uint32_t every = playing || volShown >= 0 ? 33 : (msgMode || infoUntil || millis() - lastKeyAt < 1000) ? 60 : 250;
+  uint32_t every = playing || volShown >= 0 || ticker ? 33 : (msgMode || infoUntil || millis() - lastKeyAt < 1000) ? 60 : 250;
   if (millis() - last < every) return;
   last = millis();
   drawFrame();

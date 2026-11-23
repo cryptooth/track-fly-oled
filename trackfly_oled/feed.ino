@@ -140,6 +140,73 @@ void feedControl(const char *action, int value) {
   feedKick();
 }
 
+// ---------- news: headlines of an RSS / Atom feed, read by Track Fly ----------
+//   GET <base>/news?url=<feed>&n=10 -> {"title": "...", "items": ["...", ...], "pending": true?}
+// Asked every 10 minutes; while Track Fly is still reading a new feed, every 5 s.
+static String newsLine, newsStat;   // guarded by feedMux
+static uint32_t newsRevNo = 0;
+static String newsKey;
+static uint32_t newsAt = 0, newsNext = 0;
+static volatile bool newsAgain = false;
+
+static void fetchNews() {
+  String key = cfg.newsOn && cfg.newsUrl.length() ? cfg.newsUrl + "|" + String(cfg.newsN) : "";
+  if (key != newsKey || newsAgain) { newsKey = key; newsAt = 0; newsAgain = false; }
+  if (!key.length()) {
+    xSemaphoreTake(feedMux, portMAX_DELAY);
+    if (newsLine.length() || newsStat.length()) { newsLine = ""; newsStat = ""; newsRevNo++; }
+    xSemaphoreGive(feedMux);
+    return;
+  }
+  if (newsAt && millis() - newsAt < newsNext) return;
+  newsAt = millis() | 1;
+  newsNext = 600000;
+  String body, line, stat;
+  if (!httpGet(feedBase() + "/news?url=" + urlEncode(cfg.newsUrl) + "&n=" + String(cfg.newsN), body)) {
+    stat = "Track Fly did not answer (it needs Track Fly 1.10.6 / Server 1.2.6)";
+    newsNext = 60000;
+  } else {
+    JsonDocument doc;
+    if (deserializeJson(doc, body)) { stat = "Track Fly sent something unreadable"; newsNext = 60000; }
+    else {
+      int n = 0;
+      for (JsonVariant v : doc["items"].as<JsonArray>()) {
+        String h = v | "";
+        if (!h.length()) continue;
+        if (line.length()) line += "   \xE2\x80\xA2   ";
+        line += h;
+        if (++n >= cfg.newsN) break;
+      }
+      String title = doc["title"] | "";
+      String err = doc["error"] | "";
+      if (n) stat = String(n) + (n == 1 ? " headline" : " headlines") + (title.length() ? " from " + title : "");
+      else if (doc["pending"] | false) { stat = "Track Fly is reading the feed"; newsNext = 5000; }
+      else stat = err.length() ? err : "no headlines in this feed";
+      if (!n && err.length() && newsLine.length()) line = newsLine;   // keep the old ones on a hiccup
+    }
+  }
+  xSemaphoreTake(feedMux, portMAX_DELAY);
+  if (line != newsLine || stat != newsStat) { newsLine = line; newsStat = stat; newsRevNo++; }
+  xSemaphoreGive(feedMux);
+}
+
+bool newsTake(String &text, uint32_t &rev) {
+  if (xSemaphoreTake(feedMux, 0) != pdTRUE) return false;
+  text = newsLine;
+  rev = newsRevNo;
+  xSemaphoreGive(feedMux);
+  return true;
+}
+
+String newsStatus() {
+  xSemaphoreTake(feedMux, portMAX_DELAY);
+  String s = cfg.newsOn ? newsStat : String("");
+  xSemaphoreGive(feedMux);
+  return s;
+}
+
+void newsRefresh() { newsAgain = true; feedKick(); }
+
 static void feedTask(void *) {
   uint32_t lastTargets = 0;
   for (;;) {
@@ -159,6 +226,7 @@ static void feedTask(void *) {
       shared = n;
       if (changed) sharedRev++;
       xSemaphoreGive(feedMux);
+      if (ok) fetchNews();
       if (!lastTargets || millis() - lastTargets > 30000) { fetchTargets(); lastTargets = millis(); }
       static int fails = 0;
       static uint32_t lastDiscover = 0;

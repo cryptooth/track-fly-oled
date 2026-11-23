@@ -17,7 +17,7 @@
  *        1.9 MB app slots for OTA)
  */
 
-#define FW_VERSION "0.2.1"
+#define FW_VERSION "0.3.0"
 
 #include <Arduino.h>
 #include <Preferences.h>
@@ -62,6 +62,9 @@ void settingsLoad() {
   cfg.nightMode = prefs.getUChar("nmode", cfg.nightMode);
   cfg.speed   = prefs.getUChar("speed", cfg.speed);
   cfg.show    = prefs.getUShort("show", cfg.show);
+  cfg.newsOn  = prefs.getBool("newson", cfg.newsOn);
+  cfg.newsUrl = prefs.getString("newsurl", cfg.newsUrl);
+  cfg.newsN   = constrain(prefs.getUChar("newsn", cfg.newsN), 1, 30);
   cfg.autoUpdate = prefs.getBool("autoupd", cfg.autoUpdate);
   prefs.end();
   if (cfg.bright > 3) cfg.bright = 3;
@@ -83,6 +86,9 @@ void settingsSave() {
   prefs.putUChar("nmode", cfg.nightMode);
   prefs.putUChar("speed", cfg.speed);
   prefs.putUShort("show", cfg.show);
+  prefs.putBool("newson", cfg.newsOn);
+  prefs.putString("newsurl", cfg.newsUrl);
+  prefs.putUChar("newsn", cfg.newsN);
   prefs.putBool("autoupd", cfg.autoUpdate);
   prefs.end();
 }

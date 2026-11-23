@@ -20,6 +20,8 @@ struct Now {
 struct Clock {
   const char *time = "", *date = "", *note = "";   // note: e.g. the followed zone
   bool seconds = false;         // colon blink phase
+  const char *news = "";        // headlines gliding along the bottom ("" = none)
+  uint8_t speed = 1;            // their pace: 0 slow, 1 normal, 2 fast
 };
 
 void nowPlaying(const Now &n, uint32_t ms);
