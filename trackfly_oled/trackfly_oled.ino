@@ -17,7 +17,7 @@
  *        1.9 MB app slots for OTA)
  */
 
-#define FW_VERSION "0.3.0"
+#define FW_VERSION "0.3.2"
 
 #include <Arduino.h>
 #include <Preferences.h>

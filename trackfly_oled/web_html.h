@@ -24,6 +24,7 @@ input:focus,select:focus{outline:none;border-color:var(--or)}
 .seg{display:flex;gap:6px}.seg button{flex:1;margin:0;padding:9px 0;background:var(--card);border:1px solid var(--line);color:var(--dim);font-weight:500}
 .seg button.on{border-color:var(--or);color:var(--tx)}
 button{width:100%;margin-top:16px;padding:12px;border:0;border-radius:7px;background:var(--or);color:#18181a;font:inherit;font-weight:700;font-size:15px;cursor:pointer}
+.savebar{position:sticky;bottom:0;background:var(--bg);padding:2px 0 12px;margin-top:8px;border-top:1px solid var(--line)}
 button.ghost{background:transparent;border:1px solid var(--line);color:var(--tx);font-weight:500}
 button.warn{background:transparent;border:1px solid #5a2c22;color:#ff9b80;font-weight:500}
 .now{background:var(--card);border-radius:9px;padding:12px 13px;font-size:13px}
@@ -119,7 +120,7 @@ static const char CONTROL_HTML[] PROGMEM = R"HTML(<!doctype html><html><head><me
 <label class=chk><input type=checkbox id=newson> Headlines glide along the bottom of the clock screen</label>
 <label>RSS or Atom feed address</label><input type=text id=newsurl placeholder="https://feeds.bbci.co.uk/news/rss.xml">
 <label>Headlines</label><select id=newsn><option>3</option><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option></select>
-<button onclick=saveNews()>Save</button><div class=st id=newsst></div>
+<div class=st id=newsst style="text-align:left"></div>
 <p class=hint>Track Fly reads the feed for the display (Track Fly 1.10.6 or Track Fly Server 1.2.6 and later).</p>
 </section>
 
@@ -127,7 +128,6 @@ static const char CONTROL_HTML[] PROGMEM = R"HTML(<!doctype html><html><head><me
 <label>Name (opens as name.local)</label><input type=text id=name maxlength=31>
 <label>New web password (blank keeps the current one, user is admin)</label><input type=password id=wpass maxlength=31>
 <label class=chk><input type=checkbox id=nopass> Remove the password</label>
-<button onclick=save()>Save</button><div class=st id=st></div>
 </section>
 
 <section><h2>Firmware</h2>
@@ -141,7 +141,8 @@ static const char CONTROL_HTML[] PROGMEM = R"HTML(<!doctype html><html><head><me
 <section><h2>Reset</h2>
 <button class=ghost onclick="act('/forget','Forget the WiFi network and restart in setup mode?')">Forget WiFi</button>
 <button class=warn onclick="act('/factory','Erase every setting and restart?')">Factory reset</button>
-</section></main>
+</section>
+<div class=savebar><button onclick=save()>Save settings</button><div class=st id=st></div></div></main>
 <script>
 const $=i=>document.getElementById(i);let BR=3,SP=1,first=true;
 const m2t=m=>('0'+(m/60|0)).slice(-2)+':'+('0'+(m%60)).slice(-2);
@@ -156,6 +157,7 @@ const ST={playing:'playing',paused:'paused',stopped:'stopped',not_running:'playe
 async function poll(){
  try{const j=await (await fetch('/api/state')).json();
   $('sub').textContent='v'+j.fw+' · '+j.name+'.local';$('fw').textContent=j.fw;
+  $('newsst').textContent=j.newsOn?(j.newsStatus||''):'';
   const n=j.now;$('nst').textContent=n.reachable?(ST[n.state]||n.state||'–')+(n.source?' · '+n.source:'')+(n.zone?' · '+n.zone:''):'Track Fly not reachable';
   $('ntt').textContent=n.title||n.text||' ';$('nar').textContent=n.artist||'';
   $('wifi').textContent=j.ssid+' · '+j.rssi+' dBm';$('addr').textContent=j.ip;
@@ -175,21 +177,12 @@ async function poll(){
 async function save(){
  const fv=$('follow').value.split('|');
  const b=new URLSearchParams({feed:$('feed').value,source:fv[0],zone:fv.slice(1).join('|'),
-  bright:BR,speed:SP,show:BITS.reduce((m,c)=>c.checked?m|+c.dataset.bit:m,0xFF80),flip:$('flip').checked?1:0,autoUpdate:$('autoupd').checked?1:0,night:$('night').checked?1:0,nightFrom:t2m($('nfrom').value),nightTo:t2m($('nto').value),nightMode:$('nmode').value,tz:$('tz').value,name:$('name').value});
+  bright:BR,speed:SP,show:BITS.reduce((m,c)=>c.checked?m|+c.dataset.bit:m,0xFF80),flip:$('flip').checked?1:0,autoUpdate:$('autoupd').checked?1:0,night:$('night').checked?1:0,nightFrom:t2m($('nfrom').value),nightTo:t2m($('nto').value),nightMode:$('nmode').value,tz:$('tz').value,name:$('name').value,newsOn:$('newson').checked?1:0,newsUrl:$('newsurl').value,newsN:$('newsn').value});
  if($('wpass').value)b.append('wpass',$('wpass').value);
  if($('nopass').checked)b.append('nopass','1');
  $('st').textContent='Saving…';
  try{const r=await fetch('/api/settings',{method:'POST',body:b});$('st').textContent=r.ok?'Saved':'Error: '+await r.text();
   $('wpass').value='';$('nopass').checked=false;}catch(e){$('st').textContent='Connection error';}
-}
-async function saveNews(){
- const st=$('newsst');st.textContent='Saving…';
- try{const r=await fetch('/api/settings',{method:'POST',body:new URLSearchParams({newsOn:$('newson').checked?1:0,newsUrl:$('newsurl').value,newsN:$('newsn').value})});
-  if(!r.ok){st.textContent='Error: '+await r.text();return;}
-  for(let k=0;k<8;k++){await new Promise(z=>setTimeout(z,1500));const j=await (await fetch('/api/state')).json();
-   $('newson').checked=j.newsOn;$('newsurl').value=j.newsUrl||'';
-   st.textContent='Saved'+(j.newsStatus?': '+j.newsStatus:'');if(!j.newsOn||/headline|answer|reach|old/i.test(j.newsStatus||''))break;}
- }catch(e){st.textContent='Connection error';}
 }
 function fwup(){
  const f=$('fwf').files[0],st=$('fwst');

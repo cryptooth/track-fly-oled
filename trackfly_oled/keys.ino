@@ -1,7 +1,12 @@
-// 1x4 membrane keypad. Keys 1-4 on GPIO0, GPIO1, GPIO10 (or GPIO3), GPIO20, common to
-// GND (internal pull-ups). Key 3 is read on both GPIO10 and GPIO3, whichever is wired;
-// a battery divider would then need GPIO10 for key 3. GPIO2/8/9 are strapping pins,
-// GPIO21 is the serial log.
+// 1x4 membrane keypad, common to GND (internal pull-ups). Each key is read on two pins,
+// whichever is wired:
+//   key 1  GPIO0 or GPIO8      (the carrier board uses 8, 9, 10, 20; the hand-wired
+//   key 2  GPIO1 or GPIO9       build 0, 1, 3 or 10, 20)
+//   key 3  GPIO10 or GPIO3
+//   key 4  GPIO20
+// GPIO9 is also the SuperMini's BOOT button (so BOOT is play / pause), and GPIO8 its
+// LED, which lights while key 1 is held. Holding key 2 while powering up enters the
+// USB bootloader. A battery divider needs GPIO3 free. GPIO21 is the serial log.
 //
 //            short                       long (0.6 s)
 //   key 1    previous                    volume down (repeats while held)
@@ -17,7 +22,7 @@
 extern Settings cfg;
 
 static const uint8_t KEY_PIN[4] = {0, 1, 10, 20};
-static const uint8_t KEY3_ALT = 3;
+static const int8_t KEY_ALT[4] = {8, 9, 3, -1};
 static const uint32_t DEBOUNCE = 25, LONG_MS = 600, REPEAT_MS = 180;
 
 struct Key {
@@ -36,8 +41,10 @@ static uint32_t volSentAt = 0;
 static bool volDirty = false;
 
 void keysBegin() {
-  for (int i = 0; i < 4; i++) pinMode(KEY_PIN[i], INPUT_PULLUP);
-  pinMode(KEY3_ALT, INPUT_PULLUP);
+  for (int i = 0; i < 4; i++) {
+    pinMode(KEY_PIN[i], INPUT_PULLUP);
+    if (KEY_ALT[i] >= 0) pinMode(KEY_ALT[i], INPUT_PULLUP);
+  }
 }
 
 static void sendVolume(bool force) {
@@ -115,7 +122,7 @@ void keysLoop() {
   uint32_t now = millis();
   for (int i = 0; i < 4; i++) {
     Key &k = keys[i];
-    bool r = digitalRead(KEY_PIN[i]) == LOW || (i == 2 && digitalRead(KEY3_ALT) == LOW);
+    bool r = digitalRead(KEY_PIN[i]) == LOW || (KEY_ALT[i] >= 0 && digitalRead(KEY_ALT[i]) == LOW);
     if (r != k.raw) { k.raw = r; k.rawAt = now; }
     if (r == k.down || now - k.rawAt < DEBOUNCE) continue;
     k.down = r;

@@ -56,7 +56,7 @@ Leave D2–D7 unconnected. With **R19 and R20** fitted the module is in 3-wire S
 
 ### Keypad (optional)
 
-A 1×4 membrane keypad: the common wire to GND, keys 1–4 to GPIO0, GPIO1, GPIO10 and GPIO20 (the firmware turns on the internal pull-ups). Key 3 is also read on GPIO3, but keep GPIO3 free if you plan to measure a battery there.
+A 1×4 membrane keypad: the common wire to GND, keys 1–4 to GPIO0, GPIO1, GPIO10 and GPIO20 (the firmware turns on the internal pull-ups). Each key is also read on a second pin, whichever is wired: key 1 on GPIO8, key 2 on GPIO9 (the BOOT button, so BOOT doubles as play / pause), key 3 on GPIO3. Keep GPIO3 free if you plan to measure a battery there.
 
 | Key | Short press | Long press (0.6 s) |
 |---|---|---|
